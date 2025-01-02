@@ -34,6 +34,7 @@ const ErrorList = @import("ErrorList.zig");
 const MetricModifier = fontpkg.Metrics.Modifier;
 const help_strings = @import("help_strings");
 pub const Command = @import("command.zig").Command;
+const LinkAction = @import("../input/Link.zig").Action;
 const RepeatableReadableIO = @import("io.zig").RepeatableReadableIO;
 const RepeatableStringMap = @import("RepeatableStringMap.zig");
 pub const Path = @import("path.zig").Path;
@@ -1242,8 +1243,6 @@ scrollbar: Scrollbar = .system,
 ///
 /// A default link that matches a URL and opens it in the system opener always
 /// exists. This can be disabled using `link-url`.
-///
-/// TODO: This can't currently be set!
 link: RepeatableLink = .{},
 
 /// Enable URL matching. URLs are matched on hover with control (Linux) or
@@ -6942,10 +6941,26 @@ pub const RepeatableLink = struct {
     links: std.ArrayListUnmanaged(inputpkg.Link) = .{},
 
     pub fn parseCLI(self: *Self, alloc: Allocator, input_: ?[]const u8) !void {
-        _ = self;
-        _ = alloc;
-        _ = input_;
-        return error.NotImplemented;
+        const input = input_ orelse return error.ValueRequired;
+        if (input.len == 0) return error.ValueRequired;
+        const eqlIdx = std.mem.indexOf(u8, input, "=") orelse
+            return error.InvalidValue;
+
+        const ActionType = enum { open, copy_to_clipboard };
+        const actionValue = std.mem.trim(u8, input[0..eqlIdx], cli.args.whitespace);
+        const actionType = std.meta.stringToEnum(ActionType, actionValue) orelse return error.InvalidValue;
+        const action: LinkAction = switch (actionType) {
+            .open => .{ .open = {} },
+            .copy_to_clipboard => .{ .copy_to_clipboard = {} },
+        };
+
+        const pattern = std.mem.trim(u8, input[eqlIdx + 1 ..], cli.args.whitespace);
+
+        try self.links.append(alloc, .{
+            .regex = try alloc.dupeZ(u8, pattern),
+            .action = action,
+            .highlight = .{ .hover_mods = inputpkg.ctrlOrSuper(.{}) },
+        });
     }
 
     /// Deep copy of the struct. Required by Config.
@@ -6980,9 +6995,12 @@ pub const RepeatableLink = struct {
 
     /// Used by Formatter
     pub fn formatEntry(self: Self, formatter: formatterpkg.EntryFormatter) !void {
-        // This currently can't be set so we don't format anything.
-        _ = self;
-        _ = formatter;
+        for (0.., self.links.items) |i, *item| {
+            // Don't display the default link
+            if (i > 0 or !std.mem.eql(u8, item.regex, url.regex)) {
+                try formatter.formatEntry([]const u8, item.regex);
+            }
+        }
     }
 };
 
