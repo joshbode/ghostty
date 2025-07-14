@@ -26,6 +26,10 @@ pub const Action = union(enum) {
     /// For example, on macOS this is "open" and on Linux this is "xdg-open".
     open: void,
 
+    /// Open the full matched value using the executable program.
+    /// For example, a custom open wrapper to remotely control vim or VS Code
+    exec: []const u8,
+
     /// Copy the full matched value to the clipboard.
     copy_to_clipboard: void,
 
