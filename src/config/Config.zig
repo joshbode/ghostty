@@ -6946,15 +6946,26 @@ pub const RepeatableLink = struct {
         const eqlIdx = std.mem.indexOf(u8, input, "=") orelse
             return error.InvalidValue;
 
-        const ActionType = enum { open, copy_to_clipboard };
         const actionValue = std.mem.trim(u8, input[0..eqlIdx], cli.args.whitespace);
+        const pattern = std.mem.trim(u8, input[eqlIdx + 1 ..], cli.args.whitespace);
+
+        const EXEC_PREFIX = "exec:";
+        if (std.mem.startsWith(u8, actionValue, EXEC_PREFIX)) {
+            const execPath = actionValue[EXEC_PREFIX.len..eqlIdx];
+            try self.links.append(alloc, .{
+                .regex = try alloc.dupeZ(u8, pattern),
+                .action = .{ .exec = try alloc.dupeZ(u8, execPath) },
+                .highlight = .{ .hover_mods = inputpkg.ctrlOrSuper(.{}) },
+            });
+            return;
+        }
+
+        const ActionType = enum { open, copy_to_clipboard };
         const actionType = std.meta.stringToEnum(ActionType, actionValue) orelse return error.InvalidValue;
         const action: LinkAction = switch (actionType) {
             .open => .{ .open = {} },
             .copy_to_clipboard => .{ .copy_to_clipboard = {} },
         };
-
-        const pattern = std.mem.trim(u8, input[eqlIdx + 1 ..], cli.args.whitespace);
 
         try self.links.append(alloc, .{
             .regex = try alloc.dupeZ(u8, pattern),
