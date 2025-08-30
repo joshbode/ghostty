@@ -4592,7 +4592,7 @@ pub fn performBindingAction(self: *Surface, action: input.Binding.Action) !bool 
             const pos = try self.rt_surface.getCursorPos();
             if (try self.linkAtPos(pos)) |link_info| {
                 const url_text = switch (link_info[0]) {
-                    .open => url_text: {
+                    .open, .exec, .copy_to_clipboard => url_text: {
                         // For regex links, get the text from selection
                         break :url_text (self.io.terminal.screen.selectionString(self.alloc, .{
                             .sel = link_info[1],
