@@ -36,6 +36,13 @@ pub const Action = union(enum) {
     /// Open the OSC8 hyperlink under the mouse position. _-prefixed means
     /// this can't be user-specified, it's only used internally.
     _open_osc8: void,
+
+    pub fn clone(self: *const Action, alloc: Allocator) Allocator.Error!Action {
+        return switch (self.*) {
+            .open, .copy_to_clipboard, ._open_osc8 => self.*,
+            .exec => |v| .{ .exec = try alloc.dupe(u8, v) }
+        };
+    }
 };
 
 pub const Highlight = union(enum) {
@@ -73,7 +80,7 @@ pub fn oniRegex(self: *const Link) !oni.Regex {
 pub fn clone(self: *const Link, alloc: Allocator) Allocator.Error!Link {
     return .{
         .regex = try alloc.dupe(u8, self.regex),
-        .action = self.action,
+        .action = try self.action.clone(alloc),
         .highlight = self.highlight,
     };
 }
