@@ -1,5 +1,6 @@
 const std = @import("std");
 const adw = @import("adw");
+const gdk = @import("gdk");
 const glib = @import("glib");
 const gobject = @import("gobject");
 const gtk = @import("gtk");
@@ -66,6 +67,18 @@ pub const ClipboardConfirmationDialog = extern struct {
             );
         };
 
+        pub const @"clipboard-image" = struct {
+            pub const name = "clipboard-image";
+            const impl = gobject.ext.defineProperty(
+                name,
+                Self,
+                ?*gdk.Texture,
+                .{
+                    .accessor = C.privateObjFieldAccessor("clipboard_image"),
+                },
+            );
+        };
+
         pub const blur = struct {
             pub const name = "blur";
             const impl = gobject.ext.defineProperty(
@@ -115,6 +128,10 @@ pub const ClipboardConfirmationDialog = extern struct {
 
         /// The clipboard contents being read/written.
         clipboard_contents: ?*gtk.TextBuffer = null,
+
+        /// An image preview of the clipboard contents. When set, it is
+        /// shown in place of the text contents.
+        clipboard_image: ?*gdk.Texture = null,
 
         /// Whether the contents should be blurred.
         blur: bool = false,
@@ -223,6 +240,16 @@ pub const ClipboardConfirmationDialog = extern struct {
         }
     }
 
+    /// The name of the stack page previewing the clipboard contents:
+    /// the image page when an image preview is set, the text page
+    /// otherwise.
+    fn closurePreviewPage(
+        _: *Self,
+        image: ?*gdk.Texture,
+    ) callconv(.c) ?[*:0]const u8 {
+        return glib.ext.dupeZ(u8, if (image != null) "image" else "text");
+    }
+
     fn revealButtonClicked(_: *gtk.Button, self: *Self) callconv(.c) void {
         const priv = self.private();
         priv.text_view_scroll.as(gtk.Widget).setSensitive(@intFromBool(true));
@@ -270,6 +297,10 @@ pub const ClipboardConfirmationDialog = extern struct {
         if (priv.clipboard_contents) |v| {
             v.unref();
             priv.clipboard_contents = null;
+        }
+        if (priv.clipboard_image) |v| {
+            v.unref();
+            priv.clipboard_image = null;
         }
 
         gtk.Widget.disposeTemplate(
@@ -329,12 +360,14 @@ pub const ClipboardConfirmationDialog = extern struct {
             class.bindTemplateCallback("hide_clicked", &hideButtonClicked);
             class.bindTemplateCallback("notify_blur", &propBlur);
             class.bindTemplateCallback("notify_request", &propRequest);
+            class.bindTemplateCallback("preview_page", &closurePreviewPage);
 
             // Properties
             gobject.ext.registerProperties(class, &.{
                 properties.blur.impl,
                 properties.@"can-remember".impl,
                 properties.@"clipboard-contents".impl,
+                properties.@"clipboard-image".impl,
                 properties.request.impl,
             });
 

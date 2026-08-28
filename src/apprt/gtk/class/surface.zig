@@ -4143,6 +4143,7 @@ const Clipboard = struct {
             self,
             .{ .osc_52_write = clipboard_type },
             text,
+            null,
         );
     }
 
@@ -4289,8 +4290,9 @@ const Clipboard = struct {
     }
 
     /// Show the confirmation dialog for a Kitty clipboard protocol
-    /// request. The preview shown is the text representation when the
-    /// contents carry one, otherwise the list of MIME types involved.
+    /// request. The preview shown is the image when the contents carry
+    /// a decodable image representation, otherwise the text
+    /// representation, otherwise the list of MIME types involved.
     ///
     /// The contents are anytype because they are only forwarded to the
     /// preview helpers; see kittyPreview for why those take anytype.
@@ -4302,7 +4304,46 @@ const Clipboard = struct {
         const alloc = Application.default().allocator();
         const preview: ?[:0]const u8 = kittyPreview(alloc, contents) catch null;
         defer if (preview) |v| alloc.free(v);
-        showClipboardConfirmation(self, req, preview orelse "");
+        const image = kittyImagePreview(contents);
+        defer if (image) |v| v.unref();
+        showClipboardConfirmation(self, req, preview orelse "", image);
+    }
+
+    /// Create a texture for the first decodable image representation
+    /// in the contents, if any, for the confirmation dialog preview.
+    /// The caller owns the returned reference.
+    ///
+    /// The contents are anytype because the callers hold different
+    /// element types with the same field shape: write requests carry
+    /// []const apprt.ClipboardContent (sentinel-terminated so they can
+    /// cross the C apprt boundary) while reads gather []const
+    /// terminal.clipboard.Content. Only the mime and data fields are
+    /// read, so comptime duck typing avoids copying one representation
+    /// into the other.
+    fn kittyImagePreview(contents: anytype) ?*gdk.Texture {
+        for (contents) |content| {
+            if (!std.mem.startsWith(u8, content.mime, "image/")) continue;
+            if (content.data.len == 0) continue;
+
+            const bytes = glib.Bytes.new(content.data.ptr, content.data.len);
+            defer bytes.unref();
+
+            // TODO: use glycin directly here so untrusted image data
+            // is decoded in its sandboxed decoder rather than by
+            // GTK's in-process decoders.
+            var gerr: ?*glib.Error = null;
+            if (gdk.Texture.newFromBytes(bytes, &gerr)) |texture| {
+                return texture;
+            }
+            if (gerr) |err| {
+                defer err.free();
+                log.debug(
+                    "failed to decode clipboard image preview err={s}",
+                    .{err.f_message orelse "(no message)"},
+                );
+            }
+        }
+        return null;
     }
 
     /// Build the confirmation dialog preview for Kitty clipboard
@@ -4643,6 +4684,7 @@ const Clipboard = struct {
                     self,
                     .{ .paste = .standard },
                     text,
+                    null,
                 );
                 return;
             },
@@ -4672,6 +4714,7 @@ const Clipboard = struct {
         self: *Surface,
         req: apprt.ClipboardRequest,
         str: [:0]const u8,
+        image: ?*gdk.Texture,
     ) void {
         // Build a text buffer for our contents
         const contents_buf: *gtk.TextBuffer = .new(null);
@@ -4683,6 +4726,7 @@ const Clipboard = struct {
             ClipboardConfirmationDialog,
             .{
                 .request = &req,
+                .@"clipboard-image" = image,
                 .@"can-remember" = switch (req) {
                     .osc_52_read, .osc_52_write => true,
 
@@ -4875,6 +4919,7 @@ const Clipboard = struct {
                     self,
                     req.state,
                     str,
+                    null,
                 );
                 return;
             },
