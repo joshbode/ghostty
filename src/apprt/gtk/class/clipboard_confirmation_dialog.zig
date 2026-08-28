@@ -202,6 +202,25 @@ pub const ClipboardConfirmationDialog = extern struct {
             },
             .list => unreachable,
         }
+
+        // The remember switch means different things for different
+        // request types: OSC 52 remembers by changing the configured
+        // policy, while Kitty clipboard protocol requests record a
+        // session grant for the password supplied by the program.
+        switch (req.*) {
+            .kitty_read, .kitty_write => {
+                // TODO: mark these strings for translation with
+                // i18n._() and regenerate the translation files.
+                priv.remember_choice.as(adw.PreferencesRow).setTitle(
+                    "Remember choice for this terminal session",
+                );
+                priv.remember_choice.as(adw.ActionRow).setSubtitle(
+                    "Future requests with the same password will be allowed",
+                );
+            },
+            .osc_52_read, .osc_52_write, .paste => {},
+            .list => unreachable,
+        }
     }
 
     fn revealButtonClicked(_: *gtk.Button, self: *Self) callconv(.c) void {
