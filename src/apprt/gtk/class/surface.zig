@@ -4852,6 +4852,16 @@ const Clipboard = struct {
         const surface = priv.core_surface orelse return;
         const req = dialog.getRequest() orelse return;
 
+        // The denial consumes the request, and protocols whose client
+        // waits on a reply are answered: an OSC 52 read replies with
+        // empty contents and the Kitty clipboard protocol reports
+        // EPERM. The other request types simply don't happen.
+        //
+        // This has to happen before the policy is changed below, because
+        // the OSC 52 reply is written by the same path that serves an
+        // allowed read, and that path asserts reads aren't denied.
+        surface.denyClipboardRequest(req.*);
+
         // Handle remember. Kitty clipboard protocol session grants only
         // record allowed requests, so a denied request is never
         // remembered.
@@ -4861,12 +4871,6 @@ const Clipboard = struct {
             .kitty_read, .kitty_write => {},
             .paste, .list => @panic("request should not be able to be remembered"),
         };
-
-        // The denial consumes the request, and protocols whose client
-        // waits on a reply are answered: an OSC 52 read replies with
-        // empty contents and the Kitty clipboard protocol reports
-        // EPERM. The other request types simply don't happen.
-        surface.denyClipboardRequest(req.*);
     }
 
     fn clipboardReadText(
