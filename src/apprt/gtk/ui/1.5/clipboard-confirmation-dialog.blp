@@ -23,79 +23,77 @@ template $GhosttyClipboardConfirmationDialog: Adw.AlertDialog {
   extra-child: ListBox {
     selection-mode: none;
 
-    Overlay {
-      styles [
-        "osd",
-        "clipboard-overlay",
-      ]
+    Box {
+      orientation: vertical;
+      spacing: 6;
+      // One representation per page, added by the dialog once it knows
+      // what the clipboard holds. They are picked from a list rather
+      // than laid out as tabs because a write can carry up to 64 of
+      // them: tabs for that many either overflow into a scroller or
+      // shrink past reading, while a dropdown stays one row however
+      // many there are, and ellipsizes the long MIME names instead of
+      // widening the dialog.
+      DropDown parts_dropdown {
+        notify::selected => $parts_selected();
+        model: bind parts_stack.pages;
+        visible: false;
 
-      Stack {
-        visible-child-name: bind $preview_page(template.clipboard-image) as <string>;
-
-        StackPage {
-          name: "text";
-
-          child: ScrolledWindow text_view_scroll {
-            width-request: 500;
-            height-request: 200;
-
-            TextView text_view {
-              styles [
-                "clipboard-contents",
-              ]
-
-              cursor-visible: false;
-              editable: false;
-              monospace: true;
-              buffer: bind template.clipboard-contents;
-            }
-          };
-        }
-
-        StackPage {
-          name: "image";
-
-          child: Picture {
-            styles [
-              "clipboard-image",
-            ]
-
-            paintable: bind template.clipboard-image;
-            can-shrink: true;
-            content-fit: contain;
-          };
-        }
+        factory: Gtk.BuilderListItemFactory {
+          template Gtk.ListItem {
+            child: Gtk.Label {
+              ellipsize: end;
+              xalign: 0;
+              label: bind template.item as <Gtk.StackPage>.title;
+            };
+          }
+        };
       }
 
-      [overlay]
-      Button reveal_button {
-        clicked => $reveal_clicked();
-        visible: false;
-        halign: end;
-        valign: start;
-        margin-end: 12;
-        margin-top: 12;
-
-        Image {
-          icon-name: "view-reveal-symbolic";
-        }
-      }
-
-      [overlay]
-      Button hide_button {
-        clicked => $hide_clicked();
-        visible: false;
-        halign: end;
-        valign: start;
-        margin-end: 12;
-        margin-top: 12;
-
+      Overlay {
         styles [
-          "opaque",
+          "osd",
+          "clipboard-overlay",
         ]
 
-        Image {
-          icon-name: "view-conceal-symbolic";
+        Stack parts_stack {
+          styles [
+            "clipboard-contents",
+          ]
+
+          width-request: 500;
+          height-request: 200;
+        }
+
+        [overlay]
+        Button reveal_button {
+          clicked => $reveal_clicked();
+          visible: false;
+          halign: end;
+          valign: start;
+          margin-end: 12;
+          margin-top: 12;
+
+          Image {
+            icon-name: "view-reveal-symbolic";
+          }
+        }
+
+        [overlay]
+        Button hide_button {
+          clicked => $hide_clicked();
+          visible: false;
+          halign: end;
+          valign: start;
+          margin-end: 12;
+          margin-top: 12;
+
+          styles [
+            "opaque",
+          ]
+
+          Image {
+            icon-name: "view-conceal-symbolic";
+          }
         }
       }
     }

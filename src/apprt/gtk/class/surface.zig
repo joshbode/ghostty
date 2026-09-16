@@ -4142,8 +4142,7 @@ const Clipboard = struct {
         showClipboardConfirmation(
             self,
             .{ .osc_52_write = clipboard_type },
-            text,
-            null,
+            &[_]terminal.clipboard.Content{.{ .mime = "text/plain", .data = text }},
         );
     }
 
@@ -4259,7 +4258,7 @@ const Clipboard = struct {
         };
 
         surface.completeClipboardRequest(state, .{}) catch |err| switch (err) {
-            error.UnauthorizedPaste => showKittyConfirmation(
+            error.UnauthorizedPaste => showClipboardConfirmation(
                 self,
                 state,
                 kitty.contents,
@@ -4287,94 +4286,6 @@ const Clipboard = struct {
             dst.* = std.mem.sliceTo(mime.?, 0);
         }
         return buf[0..len];
-    }
-
-    /// Show the confirmation dialog for a Kitty clipboard protocol
-    /// request. The preview shown is the image when the contents carry
-    /// a decodable image representation, otherwise the text
-    /// representation, otherwise the list of MIME types involved.
-    ///
-    /// The contents are anytype because they are only forwarded to the
-    /// preview helpers; see kittyPreview for why those take anytype.
-    fn showKittyConfirmation(
-        self: *Surface,
-        req: apprt.ClipboardRequest,
-        contents: anytype,
-    ) void {
-        const alloc = Application.default().allocator();
-        const preview: ?[:0]const u8 = kittyPreview(alloc, contents) catch null;
-        defer if (preview) |v| alloc.free(v);
-        const image = kittyImagePreview(contents);
-        defer if (image) |v| v.unref();
-        showClipboardConfirmation(self, req, preview orelse "", image);
-    }
-
-    /// Create a texture for the first decodable image representation
-    /// in the contents, if any, for the confirmation dialog preview.
-    /// The caller owns the returned reference.
-    ///
-    /// The contents are anytype because the callers hold different
-    /// element types with the same field shape: write requests carry
-    /// []const apprt.ClipboardContent (sentinel-terminated so they can
-    /// cross the C apprt boundary) while reads gather []const
-    /// terminal.clipboard.Content. Only the mime and data fields are
-    /// read, so comptime duck typing avoids copying one representation
-    /// into the other.
-    fn kittyImagePreview(contents: anytype) ?*gdk.Texture {
-        for (contents) |content| {
-            if (!std.mem.startsWith(u8, content.mime, "image/")) continue;
-            if (content.data.len == 0) continue;
-
-            const bytes = glib.Bytes.new(content.data.ptr, content.data.len);
-            defer bytes.unref();
-
-            // TODO: use glycin directly here so untrusted image data
-            // is decoded in its sandboxed decoder rather than by
-            // GTK's in-process decoders.
-            var gerr: ?*glib.Error = null;
-            if (gdk.Texture.newFromBytes(bytes, &gerr)) |texture| {
-                return texture;
-            }
-            if (gerr) |err| {
-                defer err.free();
-                log.debug(
-                    "failed to decode clipboard image preview err={s}",
-                    .{err.f_message orelse "(no message)"},
-                );
-            }
-        }
-        return null;
-    }
-
-    /// Build the confirmation dialog preview for Kitty clipboard
-    /// contents. The result is owned by the caller.
-    ///
-    /// The contents are anytype because the callers hold different
-    /// element types with the same field shape: write requests carry
-    /// []const apprt.ClipboardContent (sentinel-terminated so they can
-    /// cross the C apprt boundary) while reads gather []const
-    /// terminal.clipboard.Content. Only the mime and data fields are
-    /// read, so comptime duck typing avoids copying one representation
-    /// into the other.
-    fn kittyPreview(
-        alloc: Allocator,
-        contents: anytype,
-    ) Allocator.Error![:0]const u8 {
-        for (contents) |content| {
-            if (terminal.clipboard.isTextMime(content.mime)) {
-                return alloc.dupeSentinel(u8, content.data, 0);
-            }
-        }
-
-        // No text representation; list the MIME types so the user
-        // at least knows what kinds of data are involved.
-        var list: std.ArrayList(u8) = .empty;
-        defer list.deinit(alloc);
-        for (contents) |content| {
-            try list.appendSlice(alloc, content.mime);
-            try list.append(alloc, '\n');
-        }
-        return list.toOwnedSliceSentinel(alloc, 0);
     }
 
     /// State for one in-flight Kitty clipboard protocol read against
@@ -4639,7 +4550,7 @@ const Clipboard = struct {
             .remember = op.remember,
         }) catch |err| switch (err) {
             error.UnauthorizedPaste => {
-                showKittyConfirmation(
+                showClipboardConfirmation(
                     self,
                     op.state,
                     op.contents[0..op.contents_len],
@@ -4683,8 +4594,7 @@ const Clipboard = struct {
                 showClipboardConfirmation(
                     self,
                     .{ .paste = .standard },
-                    text,
-                    null,
+                    &[_]terminal.clipboard.Content{.{ .mime = "text/plain", .data = text }},
                 );
                 return;
             },
@@ -4710,23 +4620,21 @@ const Clipboard = struct {
         };
     }
 
+    /// Prompt for a clipboard request, previewing every representation
+    /// it carries.
+    ///
+    /// The contents are anytype because the callers hold different
+    /// element types with the same field shape; see
+    /// `ClipboardConfirmationDialog.setParts`.
     fn showClipboardConfirmation(
         self: *Surface,
         req: apprt.ClipboardRequest,
-        str: [:0]const u8,
-        image: ?*gdk.Texture,
+        contents: anytype,
     ) void {
-        // Build a text buffer for our contents
-        const contents_buf: *gtk.TextBuffer = .new(null);
-        defer contents_buf.unref();
-        contents_buf.insertAtCursor(str, @intCast(str.len));
-
-        // Confirm
         const dialog = gobject.ext.newInstance(
             ClipboardConfirmationDialog,
             .{
                 .request = &req,
-                .@"clipboard-image" = image,
                 .@"can-remember" = switch (req) {
                     .osc_52_read, .osc_52_write => true,
 
@@ -4737,9 +4645,10 @@ const Clipboard = struct {
 
                     .paste, .list => false,
                 },
-                .@"clipboard-contents" = contents_buf,
             },
         );
+
+        dialog.setParts(contents);
 
         _ = ClipboardConfirmationDialog.signals.confirm.connect(
             dialog,
@@ -4922,8 +4831,7 @@ const Clipboard = struct {
                 showClipboardConfirmation(
                     self,
                     req.state,
-                    str,
-                    null,
+                    &[_]terminal.clipboard.Content{.{ .mime = "text/plain", .data = str }},
                 );
                 return;
             },
