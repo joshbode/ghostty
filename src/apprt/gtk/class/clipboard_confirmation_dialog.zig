@@ -411,7 +411,7 @@ pub const ClipboardConfirmationDialog = extern struct {
                     "Remember choice for this terminal session",
                 );
                 priv.remember_choice.as(adw.ActionRow).setSubtitle(
-                    "Future requests with the same password will be allowed",
+                    "Future requests with the same token will be allowed",
                 );
             },
             .osc_52_read, .osc_52_write, .paste => {},
