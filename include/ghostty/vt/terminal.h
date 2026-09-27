@@ -2145,6 +2145,22 @@ typedef enum GHOSTTY_ENUM_TYPED {
    * Input type: GhosttyTerminalResetFn
    */
   GHOSTTY_TERMINAL_OPT_RESET = 43,
+
+  /**
+   * Enable checksum reports in response to DECRQCRA (CSI Pi ; Pg ; Pt ; Pl ;
+   * Pb ; Pr * y).
+   *
+   * This is disabled by default because a running program can checksum the
+   * screen one cell at a time and so read back everything on it, including
+   * output from other programs. Passing NULL or a pointer to false disables
+   * checksum reporting.
+   *
+   * While this is disabled, XTCHECKSUM (CSI Ps # y), which changes how the
+   * checksum is calculated, is ignored as well.
+   *
+   * Input type: bool*
+   */
+  GHOSTTY_TERMINAL_OPT_XT_CHECKSUM_REPORT = 44,
   GHOSTTY_TERMINAL_OPT_MAX_VALUE = GHOSTTY_ENUM_MAX_VALUE,
 } GhosttyTerminalOption;
 

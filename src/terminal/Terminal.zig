@@ -17,6 +17,7 @@ const uucode = @import("uucode");
 const ansi = @import("ansi.zig");
 const modespkg = @import("modes.zig");
 const charsets = @import("charsets.zig");
+const xt_checksum = @import("xt_checksum.zig");
 const csi = @import("csi.zig");
 const hyperlink = @import("hyperlink.zig");
 const glyph = @import("apc/glyph.zig");
@@ -119,6 +120,9 @@ flags: packed struct {
     /// then we want to capture the shift key for the mouse protocol
     /// if the configuration allows it.
     mouse_shift_capture: enum(u2) { null, false, true } = .null,
+
+    /// The checksum variant DECRQCRA computes, set via XTCHECKSUM.
+    xt_checksum: xt_checksum.Flags = .{},
 
     /// True if the window is focused.
     focused: bool = true,
@@ -395,6 +399,20 @@ pub fn vtStream(self: *Terminal) Stream {
 /// This is the handler-side only for vtStream.
 pub fn vtHandler(self: *Terminal) Stream.Handler {
     return .init(self);
+}
+
+/// Compute the DECRQCRA checksum of a rectangle of the active area,
+/// using the variant selected by XTCHECKSUM.
+pub fn rectXtChecksum(self: *const Terminal, req: xt_checksum.Request) u16 {
+    const origin: ?ScrollingRegion = if (self.modes.get(.origin))
+        self.scrolling_region
+    else
+        null;
+    return xt_checksum.compute(
+        &self.screens.active.pages,
+        .init(req, self.rows, self.cols, origin),
+        self.flags.xt_checksum,
+    );
 }
 
 /// Change the cursor's current shape and blink behavior.

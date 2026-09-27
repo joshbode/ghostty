@@ -3070,6 +3070,21 @@ keybind: Keybinds = .{},
 /// Available since: 1.4.0
 @"vt-window-resize-allowed": bool = false,
 
+/// Enables or disables checksum reporting (DECRQCRA, `CSI Pi ; Pg ; Pt ;
+/// Pl ; Pb ; Pr * y`). This escape sequence allows the running program to
+/// ask for a checksum of an area of the screen. Terminal test suites use it
+/// to check what is on the screen.
+///
+/// This is disabled by default because a program can ask for the checksum of
+/// one cell at a time and so read back everything on the screen, including
+/// the output of other programs.
+///
+/// While this is disabled, XTCHECKSUM (`CSI Ps # y`), which changes how the
+/// checksum is calculated, is ignored as well.
+///
+/// Available since: 1.4.0
+@"vt-xt-checksum-report": bool = false,
+
 /// Custom shaders to run after the default shaders. This is a file path
 /// to a GLSL-syntax shader for all platforms.
 ///

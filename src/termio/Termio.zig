@@ -179,6 +179,7 @@ pub const DerivedConfig = struct {
     clipboard_write: configpkg.ClipboardAccess,
     clipboard_write_limit: usize,
     enquiry_response: []const u8,
+    xt_checksum_report: bool,
     conditional_state: configpkg.ConditionalState,
 
     pub fn init(
@@ -216,6 +217,7 @@ pub const DerivedConfig = struct {
             .clipboard_write = config.@"clipboard-write",
             .clipboard_write_limit = config.@"clipboard-write-limit-bytes".value,
             .enquiry_response = try alloc.dupe(u8, config.@"enquiry-response"),
+            .xt_checksum_report = config.@"vt-xt-checksum-report",
             .conditional_state = config._conditional_state,
 
             // This has to be last so that we copy AFTER the arena allocations
@@ -305,6 +307,7 @@ pub fn init(self: *Termio, alloc: Allocator, opts: termio.Options) !void {
         .clipboard_write = opts.config.clipboard_write,
         .clipboard_write_limit = opts.config.clipboard_write_limit,
         .enquiry_response = opts.config.enquiry_response,
+        .xt_checksum_report = opts.config.xt_checksum_report,
     };
 
     const thread_enter_state = try ThreadEnterState.create(
