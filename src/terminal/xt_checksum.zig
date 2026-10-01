@@ -3,7 +3,10 @@
 //!
 //! The checksum follows xterm's `xtermCheckRect`. No real VT420 was
 //! available to compare against while this was written, so xterm is the
-//! reference.
+//! reference:
+//!
+//! - `xtermCheckRect`: https://github.com/ThomasDickey/xterm-snapshots/blob/xterm-411/screen.c#L3162-L3290
+//! - `xtermCharSetDec`: https://github.com/ThomasDickey/xterm-snapshots/blob/xterm-411/charsets.c#L608
 const std = @import("std");
 const testing = std.testing;
 const PageList = @import("PageList.zig");
