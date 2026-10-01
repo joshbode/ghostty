@@ -3110,6 +3110,16 @@ keybind: Keybinds = .{},
 /// `no-negate,no-attributes,no-trim,full` when run with `--xterm-checksum`,
 /// which is xterm's `checksumExtension: 23`.
 ///
+/// The bits of xterm's resource are described in its
+/// [man page](https://github.com/ThomasDickey/xterm-snapshots/blob/xterm-411/xterm.man#L2870-L2896)
+/// and its [control sequence documentation](https://github.com/ThomasDickey/xterm-snapshots/blob/xterm-411/ctlseqs.ms#L2562-L2569),
+/// but where those disagree with xterm's
+/// [implementation](https://github.com/ThomasDickey/xterm-snapshots/blob/xterm-411/screen.c#L3162-L3290),
+/// Ghostty follows the implementation. The documentation describes bit 3
+/// as omitting cells that were never written to, but xterm skips those
+/// cells by default and counts them as spaces with the bit set, which is
+/// `undrawn` here. It also lists a bit 5 that xterm doesn't implement.
+///
 /// Available since: 1.4.0
 @"vt-xt-checksum-extension": XtChecksumExtension = .{},
 

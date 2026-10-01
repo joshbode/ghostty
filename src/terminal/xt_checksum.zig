@@ -19,6 +19,22 @@ const style = @import("style.zig");
 
 /// The XTCHECKSUM (CSI Ps # y) bits. The zero value is the DEC checksum,
 /// which is also what a full reset restores.
+///
+/// These are xterm's `CSBITS`, which it also takes from the
+/// `checksumExtension` resource:
+///
+/// - `CSBITS`: https://github.com/ThomasDickey/xterm-snapshots/blob/xterm-411/ptyx.h#L488-L496
+/// - XTCHECKSUM: https://github.com/ThomasDickey/xterm-snapshots/blob/xterm-411/charproc.c#L6044-L6050
+/// - Reset to `checksumExtension`: https://github.com/ThomasDickey/xterm-snapshots/blob/xterm-411/charproc.c#L14424-L14426
+/// - `checksumExtension` docs: https://github.com/ThomasDickey/xterm-snapshots/blob/xterm-411/xterm.man#L2870-L2896
+/// - XTCHECKSUM docs: https://github.com/ThomasDickey/xterm-snapshots/blob/xterm-411/ctlseqs.ms#L2562-L2569
+///
+/// xterm's documentation disagrees with its code in two places, and we
+/// follow the code. The docs describe bit 3 as "omit checksum for cells
+/// not explicitly initialized", but `csDRAWN` does the opposite: without
+/// it those cells are skipped, and with it they count as spaces. The man
+/// page also lists a bit 5, "do not mask cell value to 7 bits", which
+/// `xtermCheckRect` never looks at.
 pub const Flags = packed struct(u5) {
     /// Don't negate the result.
     positive: bool = false,
