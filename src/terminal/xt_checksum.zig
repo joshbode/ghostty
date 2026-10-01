@@ -205,11 +205,6 @@ pub fn encode(
     try writer.print("\x1bP{d}!~{X:0>4}\x1b\\", .{ id, sum });
 }
 
-fn testChecksum(t: *Terminal, req: Request, flags: Flags) u16 {
-    const s = t.screens.active;
-    return compute(s, req.selection(&s.pages, null), flags);
-}
-
 test "xt_checksum: encode" {
     var buf: [max_encode_size]u8 = undefined;
     var writer: std.Io.Writer = .fixed(&buf);
@@ -302,60 +297,71 @@ test "xt_checksum: selection origin mode" {
 test "xt_checksum: DEC trims blanks and skips undrawn cells" {
     var t: Terminal = try .init(testing.io, testing.allocator, .{ .cols = 10, .rows = 5 });
     defer t.deinit(testing.allocator);
+    const s = t.screens.active;
     try t.printString("a b");
 
     // Only the first row, the whole width. The space is omitted and the
     // unwritten cells are skipped.
     const req: Request = .{ .top = 1, .bottom = 1 };
-    try testing.expectEqual(0 -% @as(u16, 'a' + 'b'), testChecksum(&t, req, .{}));
-    try testing.expectEqual(@as(u16, 'a' + 'b'), testChecksum(&t, req, .{ .positive = true }));
+    const sel = req.selection(&s.pages, null);
+    try testing.expectEqual(0 -% @as(u16, 'a' + 'b'), compute(s, sel, .{}));
+    try testing.expectEqual(@as(u16, 'a' + 'b'), compute(s, sel, .{ .positive = true }));
 
     // Untrimmed counts the space and the undrawn cells as spaces.
     try testing.expectEqual(
         @as(u16, 'a' + 'b' + ' ' * 8),
-        testChecksum(&t, req, .{ .positive = true, .no_trim = true }),
+        compute(s, sel, .{ .positive = true, .no_trim = true }),
     );
 
     // Undrawn cells are spaces, which are then trimmed.
     try testing.expectEqual(
         @as(u16, 'a' + 'b'),
-        testChecksum(&t, req, .{ .positive = true, .undrawn = true }),
+        compute(s, sel, .{ .positive = true, .undrawn = true }),
     );
 }
 
 test "xt_checksum: DEC counts a leading space" {
     var t: Terminal = try .init(testing.io, testing.allocator, .{ .cols = 10, .rows = 5 });
     defer t.deinit(testing.allocator);
+    const s = t.screens.active;
     try t.printString(" a\n b");
 
     // The very first counted cell is kept even if it's a space, but not
     // the first cell of later rows.
+    const req: Request = .{};
+    const sel = req.selection(&s.pages, null);
     try testing.expectEqual(
         @as(u16, ' ' + 'a' + 'b'),
-        testChecksum(&t, .{}, .{ .positive = true }),
+        compute(s, sel, .{ .positive = true }),
     );
 }
 
 test "xt_checksum: empty rectangle" {
     var t: Terminal = try .init(testing.io, testing.allocator, .{ .cols = 10, .rows = 5 });
     defer t.deinit(testing.allocator);
+    const s = t.screens.active;
     try t.printString("abc");
-    try testing.expectEqual(0, testChecksum(&t, .{ .left = 3, .right = 2 }, .{}));
+    const req: Request = .{ .left = 3, .right = 2 };
+    try testing.expectEqual(0, compute(s, req.selection(&s.pages, null), .{}));
 }
 
 test "xt_checksum: rectangle bounds" {
     var t: Terminal = try .init(testing.io, testing.allocator, .{ .cols = 10, .rows = 5 });
     defer t.deinit(testing.allocator);
+    const s = t.screens.active;
     try t.printString("abc\ndef\nghi");
+    const req: Request = .{ .top = 2, .left = 2, .bottom = 3, .right = 3 };
+    const sel = req.selection(&s.pages, null);
     try testing.expectEqual(
         @as(u16, 'e' + 'f' + 'h' + 'i'),
-        testChecksum(&t, .{ .top = 2, .left = 2, .bottom = 3, .right = 3 }, .{ .positive = true }),
+        compute(s, sel, .{ .positive = true }),
     );
 }
 
 test "xt_checksum: attributes" {
     var t: Terminal = try .init(testing.io, testing.allocator, .{ .cols = 10, .rows = 5 });
     defer t.deinit(testing.allocator);
+    const s = t.screens.active;
     try t.setAttribute(.bold);
     try t.setAttribute(.{ .underline = .single });
     try t.printString("a");
@@ -369,79 +375,89 @@ test "xt_checksum: attributes" {
     try t.printString("b");
 
     const req: Request = .{ .top = 1, .bottom = 1 };
+    const sel = req.selection(&s.pages, null);
     try testing.expectEqual(
         @as(u16, 'a' + 0x80 + 0x10 + ' ' + 0x20 + 0x40 + 'b' + 0x08 + 0x04),
-        testChecksum(&t, req, .{ .positive = true }),
+        compute(s, sel, .{ .positive = true }),
     );
     try testing.expectEqual(
         @as(u16, 'a' + 'b'),
-        testChecksum(&t, req, .{ .positive = true, .no_attributes = true }),
+        compute(s, sel, .{ .positive = true, .no_attributes = true }),
     );
 }
 
 test "xt_checksum: extended attributes keep a space" {
     var t: Terminal = try .init(testing.io, testing.allocator, .{ .cols = 10, .rows = 5 });
     defer t.deinit(testing.allocator);
+    const s = t.screens.active;
     try t.printString("a");
     try t.setAttribute(.italic);
     try t.printString(" ");
 
+    const req: Request = .{ .top = 1, .bottom = 1 };
+    const sel = req.selection(&s.pages, null);
     try testing.expectEqual(
         @as(u16, 'a' + ' '),
-        testChecksum(&t, .{ .top = 1, .bottom = 1 }, .{ .positive = true }),
+        compute(s, sel, .{ .positive = true }),
     );
 }
 
 test "xt_checksum: DEC 8-bit values" {
     var t: Terminal = try .init(testing.io, testing.allocator, .{ .cols = 10, .rows = 5 });
     defer t.deinit(testing.allocator);
+    const s = t.screens.active;
 
     // é is 0xE9, masked to 7 bits; the euro sign is outside of 8 bits.
     try t.printString("é€");
     const req: Request = .{ .top = 1, .bottom = 1 };
+    const sel = req.selection(&s.pages, null);
     try testing.expectEqual(
         @as(u16, 0x69 + 0x1B),
-        testChecksum(&t, req, .{ .positive = true }),
+        compute(s, sel, .{ .positive = true }),
     );
     try testing.expectEqual(
         @as(u16, 0xE9 + 0x20AC),
-        testChecksum(&t, req, .{ .positive = true, .full = true }),
+        compute(s, sel, .{ .positive = true, .full = true }),
     );
 }
 
 test "xt_checksum: wide characters" {
     var t: Terminal = try .init(testing.io, testing.allocator, .{ .cols = 10, .rows = 5 });
     defer t.deinit(testing.allocator);
+    const s = t.screens.active;
     try t.printString("橋");
 
     const req: Request = .{ .top = 1, .bottom = 1 };
+    const sel = req.selection(&s.pages, null);
     try testing.expectEqual(
         @as(u16, 0x1B + 0x1B),
-        testChecksum(&t, req, .{ .positive = true }),
+        compute(s, sel, .{ .positive = true }),
     );
     try testing.expectEqual(
         @as(u16, 0x6A4B),
-        testChecksum(&t, req, .{ .positive = true, .full = true }),
+        compute(s, sel, .{ .positive = true, .full = true }),
     );
 }
 
 test "xt_checksum: combining marks" {
     var t: Terminal = try .init(testing.io, testing.allocator, .{ .cols = 10, .rows = 5 });
     defer t.deinit(testing.allocator);
+    const s = t.screens.active;
     t.modes.set(.grapheme_cluster, true);
     try t.printString("e\u{301}");
 
     const req: Request = .{ .top = 1, .bottom = 1, .right = 1 };
+    const sel = req.selection(&s.pages, null);
     try testing.expectEqual(
         @as(u16, 'e'),
-        testChecksum(&t, req, .{ .positive = true }),
+        compute(s, sel, .{ .positive = true }),
     );
     try testing.expectEqual(
         @as(u16, 'e' + 0x301),
-        testChecksum(&t, req, .{ .positive = true, .no_trim = true }),
+        compute(s, sel, .{ .positive = true, .no_trim = true }),
     );
     try testing.expectEqual(
         @as(u16, 'e'),
-        testChecksum(&t, req, .{ .positive = true, .no_trim = true, .full = true }),
+        compute(s, sel, .{ .positive = true, .no_trim = true, .full = true }),
     );
 }
