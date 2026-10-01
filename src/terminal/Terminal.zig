@@ -424,9 +424,10 @@ pub fn rectXtChecksum(self: *const Terminal, req: xt_checksum.Request) u16 {
         self.scrolling_region
     else
         null;
+    const screen = self.screens.active;
     return xt_checksum.compute(
-        &self.screens.active.pages,
-        .init(req, self.rows, self.cols, origin),
+        screen,
+        req.selection(&screen.pages, origin),
         self.flags.xt_checksum,
     );
 }

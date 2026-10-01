@@ -10,8 +10,11 @@
 const std = @import("std");
 const testing = std.testing;
 const PageList = @import("PageList.zig");
+const Screen = @import("Screen.zig");
+const Selection = @import("Selection.zig");
 const Terminal = @import("Terminal.zig");
 const pagepkg = @import("page.zig");
+const point = @import("point.zig");
 const style = @import("style.zig");
 
 /// The XTCHECKSUM (CSI Ps # y) bits. The zero value is the DEC checksum,
@@ -46,39 +49,31 @@ pub const Request = extern struct {
     left: u16 = 0,
     bottom: u16 = 0,
     right: u16 = 0,
-};
 
-/// A rectangle in the active area, 0-based and inclusive.
-pub const Rect = struct {
-    top: u16,
-    left: u16,
-    bottom: u16,
-    right: u16,
-
-    /// Resolve a request against a screen of the given size. If `origin`
-    /// is set (DECOM), coordinates are relative to its top-left, as in
-    /// xterm. Coordinates are clamped to the screen. Returns null if the
-    /// rectangle is empty.
-    pub fn init(
-        req: Request,
-        rows: u16,
-        cols: u16,
+    /// Resolve the request to a rectangle selection of the active area.
+    /// If `origin` is set (DECOM), coordinates are relative to its
+    /// top-left, as in xterm. Coordinates are clamped to the screen.
+    /// Returns null if the rectangle is empty.
+    pub fn selection(
+        self: Request,
+        pages: *const PageList,
         origin: ?Terminal.ScrollingRegion,
-    ) ?Rect {
+    ) ?Selection {
+        const rows = pages.rows;
+        const cols = pages.cols;
         if (rows == 0 or cols == 0) return null;
         const top_margin: u16 = if (origin) |o| o.top else 0;
         const left_margin: u16 = if (origin) |o| o.left else 0;
-        const top = limit(req.top, 1, top_margin, rows);
-        const left = limit(req.left, 1, left_margin, cols);
-        const bottom = limit(req.bottom, rows, top_margin, rows);
-        const right = limit(req.right, cols, left_margin, cols);
+        const top = limit(self.top, 1, top_margin, rows);
+        const left = limit(self.left, 1, left_margin, cols);
+        const bottom = limit(self.bottom, rows, top_margin, rows);
+        const right = limit(self.right, cols, left_margin, cols);
         if (top > bottom or left > right) return null;
-        return .{
-            .top = top - 1,
-            .left = left - 1,
-            .bottom = bottom - 1,
-            .right = right - 1,
-        };
+        return .init(
+            pages.pin(.{ .active = .{ .x = left - 1, .y = top - 1 } }) orelse return null,
+            pages.pin(.{ .active = .{ .x = right - 1, .y = bottom - 1 } }) orelse return null,
+            true,
+        );
     }
 
     fn limit(v: u16, default: u16, margin: u16, max: u16) u16 {
@@ -87,10 +82,12 @@ pub const Rect = struct {
     }
 };
 
-/// Compute the checksum of a rectangle of the active area.
-pub fn compute(pages: *const PageList, rect_: ?Rect, flags: Flags) u16 {
+/// Compute the checksum of a rectangle selection.
+pub fn compute(screen: *const Screen, sel_: ?Selection, flags: Flags) u16 {
     // An empty rectangle still gets a reply, with a sum of zero.
-    const rect = rect_ orelse return 0;
+    const sel = sel_ orelse return 0;
+    const tl = sel.topLeft(screen);
+    const br = sel.bottomRight(screen);
 
     // Everything is summed modulo 2^16 since only 16 bits are reported.
     var sum: u16 = 0;
@@ -99,21 +96,22 @@ pub fn compute(pages: *const PageList, rect_: ?Rect, flags: Flags) u16 {
     // counted in the rectangle.
     var first = true;
 
-    var y = rect.top;
-    while (y <= rect.bottom) : (y += 1) {
-        const pin = pages.pin(.{ .active = .{ .y = y } }) orelse continue;
-        const cells = pin.cells(.all);
+    var it = tl.rowIterator(.right_down, br);
+    while (it.next()) |row| {
+        // Pages may be narrower than the rectangle, as in xterm, where
+        // a line may be shorter than the screen.
+        const cells = row.cells(.all);
+        const left = @min(tl.x, cells.len);
+        const right = @min(br.x + 1, cells.len);
 
-        var x = rect.left;
-        while (x <= rect.right and x < cells.len) : (x += 1) {
-            const cell = &cells[x];
+        for (cells[left..right]) |*cell| {
             var ch: u16 = switch (value(cell, flags)) {
                 .skip => continue,
                 .undrawn => if (flags.no_trim or flags.undrawn) ' ' else continue,
                 .value => |v| v,
             };
 
-            const s = pin.style(cell);
+            const s = row.style(cell);
             if (!flags.no_attributes) ch +%= attributes(cell, s);
 
             if (flags.no_trim) {
@@ -122,7 +120,7 @@ pub fn compute(pages: *const PageList, rect_: ?Rect, flags: Flags) u16 {
                 // xterm adds combining marks only in the DEC mode, and
                 // only to the untrimmed sum.
                 if (!flags.full and cell.hasGrapheme()) {
-                    if (pin.grapheme(cell)) |cps| {
+                    if (row.grapheme(cell)) |cps| {
                         for (cps) |cp| sum +%= @truncate(cp);
                     }
                 }
@@ -208,11 +206,8 @@ pub fn encode(
 }
 
 fn testChecksum(t: *Terminal, req: Request, flags: Flags) u16 {
-    return compute(
-        &t.screens.active.pages,
-        .init(req, t.rows, t.cols, null),
-        flags,
-    );
+    const s = t.screens.active;
+    return compute(s, req.selection(&s.pages, null), flags);
 }
 
 test "xt_checksum: encode" {
@@ -226,40 +221,82 @@ test "xt_checksum: encode" {
     try testing.expectEqualStrings("\x1bP1!~001A\x1b\\", writer.buffered());
 }
 
-test "xt_checksum: rect defaults and clamping" {
+test "xt_checksum: selection defaults and clamping" {
+    var t: Terminal = try .init(testing.io, testing.allocator, .{ .cols = 10, .rows = 5 });
+    defer t.deinit(testing.allocator);
+    const pages = &t.screens.active.pages;
+
+    {
+        const sel = (Request{}).selection(pages, null).?;
+        try testing.expect(sel.rectangle);
+        try testing.expectEqual(
+            point.Point{ .active = .{ .x = 0, .y = 0 } },
+            pages.pointFromPin(.active, sel.start()).?,
+        );
+        try testing.expectEqual(
+            point.Point{ .active = .{ .x = 9, .y = 4 } },
+            pages.pointFromPin(.active, sel.end()).?,
+        );
+    }
+
+    {
+        const req: Request = .{ .top = 2, .left = 3, .bottom = 99, .right = 99 };
+        const sel = req.selection(pages, null).?;
+        try testing.expectEqual(
+            point.Point{ .active = .{ .x = 2, .y = 1 } },
+            pages.pointFromPin(.active, sel.start()).?,
+        );
+        try testing.expectEqual(
+            point.Point{ .active = .{ .x = 9, .y = 4 } },
+            pages.pointFromPin(.active, sel.end()).?,
+        );
+    }
+
     try testing.expectEqual(
-        Rect{ .top = 0, .left = 0, .bottom = 4, .right = 9 },
-        Rect.init(.{}, 5, 10, null).?,
-    );
-    try testing.expectEqual(
-        Rect{ .top = 1, .left = 2, .bottom = 4, .right = 9 },
-        Rect.init(.{ .top = 2, .left = 3, .bottom = 99, .right = 99 }, 5, 10, null).?,
+        null,
+        (Request{ .top = 3, .bottom = 2 }).selection(pages, null),
     );
     try testing.expectEqual(
         null,
-        Rect.init(.{ .top = 3, .bottom = 2 }, 5, 10, null),
-    );
-    try testing.expectEqual(
-        null,
-        Rect.init(.{ .left = 3, .right = 2 }, 5, 10, null),
+        (Request{ .left = 3, .right = 2 }).selection(pages, null),
     );
 }
 
-test "xt_checksum: rect origin mode" {
+test "xt_checksum: selection origin mode" {
+    var t: Terminal = try .init(testing.io, testing.allocator, .{ .cols = 10, .rows = 5 });
+    defer t.deinit(testing.allocator);
+    const pages = &t.screens.active.pages;
     const region: Terminal.ScrollingRegion = .{
         .top = 1,
         .bottom = 3,
         .left = 2,
         .right = 8,
     };
-    try testing.expectEqual(
-        Rect{ .top = 1, .left = 2, .bottom = 4, .right = 9 },
-        Rect.init(.{}, 5, 10, region).?,
-    );
-    try testing.expectEqual(
-        Rect{ .top = 1, .left = 2, .bottom = 1, .right = 2 },
-        Rect.init(.{ .top = 1, .left = 1, .bottom = 1, .right = 1 }, 5, 10, region).?,
-    );
+
+    {
+        const sel = (Request{}).selection(pages, region).?;
+        try testing.expectEqual(
+            point.Point{ .active = .{ .x = 2, .y = 1 } },
+            pages.pointFromPin(.active, sel.start()).?,
+        );
+        try testing.expectEqual(
+            point.Point{ .active = .{ .x = 9, .y = 4 } },
+            pages.pointFromPin(.active, sel.end()).?,
+        );
+    }
+
+    {
+        const req: Request = .{ .top = 1, .left = 1, .bottom = 1, .right = 1 };
+        const sel = req.selection(pages, region).?;
+        try testing.expectEqual(
+            point.Point{ .active = .{ .x = 2, .y = 1 } },
+            pages.pointFromPin(.active, sel.start()).?,
+        );
+        try testing.expectEqual(
+            point.Point{ .active = .{ .x = 2, .y = 1 } },
+            pages.pointFromPin(.active, sel.end()).?,
+        );
+    }
 }
 
 test "xt_checksum: DEC trims blanks and skips undrawn cells" {
