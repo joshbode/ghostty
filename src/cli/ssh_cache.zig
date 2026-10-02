@@ -351,22 +351,25 @@ fn listEntries(
 }
 
 /// Whether a cache `key` matches a positional `query`. A `user@host` query
-/// (containing `@`) matches one exact key; a bare `host` query matches every
-/// key on that host regardless of user and port, comparing against the key's
-/// host component (everything after its first `@`, or the whole key if
-/// userless, without any `:port`). A bare `host:port` query matches every
-/// key on that host and port regardless of user.
+/// (containing `@`) matches one exact destination; a bare `host` query
+/// matches every key on that host regardless of user and port, and a bare
+/// `host:port` query every key on that host and port regardless of user.
+/// A missing port is the same as port 22.
 fn matchesQuery(key: []const u8, query: []const u8) bool {
-    if (std.mem.indexOfScalar(u8, query, '@') != null) {
-        return std.mem.eql(u8, key, query);
+    const key_at = std.mem.indexOfScalar(u8, key, '@');
+    const query_at = std.mem.indexOfScalar(u8, query, '@');
+    if (query_at) |i| {
+        const key_user = if (key_at) |j| key[0..j] else return false;
+        if (!std.mem.eql(u8, key_user, query[0..i])) return false;
     }
 
-    const at = std.mem.indexOfScalar(u8, key, '@');
-    const host = if (at) |i| key[i + 1 ..] else key;
-    if (DiskCache.splitHostPort(query).port != null) {
-        return std.mem.eql(u8, host, query);
-    }
-    return std.mem.eql(u8, DiskCache.splitHostPort(host).host, query);
+    const key_hp = DiskCache.splitHostPort(if (key_at) |i| key[i + 1 ..] else key);
+    const query_hp = DiskCache.splitHostPort(if (query_at) |i| query[i + 1 ..] else query);
+    if (!std.mem.eql(u8, key_hp.host, query_hp.host)) return false;
+
+    // Only a bare host query matches every port.
+    if (query_at == null and query_hp.port == null) return true;
+    return std.mem.eql(u8, key_hp.port orelse "22", query_hp.port orelse "22");
 }
 
 test matchesQuery {
@@ -399,6 +402,13 @@ test matchesQuery {
     try testing.expect(matchesQuery("user@example.com:2222", "user@example.com:2222"));
     try testing.expect(!matchesQuery("user@example.com", "user@example.com:2222"));
     try testing.expect(!matchesQuery("user@example.com:2222", "user@example.com"));
+
+    // A missing port is port 22.
+    try testing.expect(matchesQuery("user@example.com", "example.com:22"));
+    try testing.expect(matchesQuery("user@example.com", "user@example.com:22"));
+    try testing.expect(matchesQuery("user@example.com:22", "user@example.com"));
+    try testing.expect(matchesQuery("user@[::1]:22", "user@::1"));
+    try testing.expect(!matchesQuery("user@example.com:2222", "example.com:22"));
 }
 
 /// Format a Unix timestamp as an ISO-8601 UTC string

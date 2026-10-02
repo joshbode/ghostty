@@ -466,9 +466,12 @@ fn isValidHostPort(s: []const u8) bool {
 }
 
 fn isValidPort(port: []const u8) bool {
-    for (port) |c| if (c < '0' or c > '9') return false;
-    const n = std.fmt.parseInt(u16, port, 10) catch return false;
-    return n != 0;
+    // Digits only and no leading zero (which also rules out port 0), so
+    // `host:22` and `host:022` can't become distinct keys.
+    if (port.len == 0 or port[0] == '0') return false;
+    for (port) |c| if (!std.ascii.isDigit(c)) return false;
+    _ = std.fmt.parseInt(u16, port, 10) catch return false;
+    return true;
 }
 
 // Checks if a host is a valid hostname or IP address
@@ -872,6 +875,8 @@ test isValidCacheKey {
     // Invalid ports
     try testing.expect(!isValidCacheKey("user@example.com:"));
     try testing.expect(!isValidCacheKey("user@example.com:0"));
+    try testing.expect(!isValidCacheKey("user@example.com:022"));
+    try testing.expect(!isValidCacheKey("user@example.com:00"));
     try testing.expect(!isValidCacheKey("user@example.com:65536"));
     try testing.expect(!isValidCacheKey("user@example.com:+22"));
     try testing.expect(!isValidCacheKey("user@example.com:ssh"));
