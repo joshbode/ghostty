@@ -896,7 +896,11 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
                 self.draw_mutex.lockUncancelable(global.io());
                 defer self.draw_mutex.unlock(global.io());
 
-                // Release swap chain and shaders.
+                // Release swap chain and shaders. Shaders are only freed
+                // while unrealized and not every apprt unrealizes before
+                // destroying a surface (macOS never does), so mark it
+                // unrealized. This also stops any later draw.
+                self.display_realized = false;
                 self.releaseGpuResources();
 
                 // We don't release images in `releaseGpuResources`
@@ -1730,8 +1734,8 @@ pub fn Renderer(comptime GraphicsAPI: type) type {
             if (surface_size.width == 0 or surface_size.height == 0) return false;
 
             // If we have no graphics context we can't draw. This is
-            // only the case while unrealized (GTK); displayRealized
-            // rebuilds the swap chain.
+            // only the case while unrealized (GTK) or after the render
+            // thread exits; displayRealized rebuilds the swap chain.
             if (!self.display_realized) return false;
 
             // Get our swap chain, rebuilding it if it was released
