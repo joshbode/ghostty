@@ -19,6 +19,7 @@ const encoding = @import("osc/encoding.zig");
 
 pub const color = parsers.color;
 pub const semantic_prompt = parsers.semantic_prompt;
+pub const program_status = parsers.program_status;
 
 const log = std.log.scoped(.osc);
 
@@ -171,6 +172,11 @@ pub const Command = union(Key) {
     /// produced when `Parser.unknown_max_bytes` is nonzero.
     unknown: Unknown,
 
+    /// Program status protocol (OSC 7501). A program reports what it is
+    /// doing, such as working or waiting on the user, or asks whether the
+    /// terminal supports the protocol. See `ProgramStatus`.
+    program_status: ProgramStatus,
+
     pub const SemanticPrompt = parsers.semantic_prompt.Command;
 
     pub const KittyClipboardProtocol = parsers.kitty_clipboard_protocol.OSC;
@@ -178,6 +184,8 @@ pub const Command = union(Key) {
     pub const KittyDndProtocol = parsers.kitty_dnd_protocol.OSC;
 
     pub const KittyDesktopNotification = parsers.kitty_desktop_notification.OSC;
+
+    pub const ProgramStatus = parsers.program_status.Command;
 
     pub const Key = LibEnum(
         lib.target,
@@ -211,6 +219,7 @@ pub const Command = union(Key) {
             "context_signal",
             "kitty_desktop_notification",
             "unknown",
+            "program_status",
         },
     );
 
@@ -454,6 +463,9 @@ pub const Parser = struct {
         @"55",
         @"66",
         @"72",
+        @"75",
+        @"750",
+        @"7501",
         @"77",
         @"99",
         @"104",
@@ -541,6 +553,7 @@ pub const Parser = struct {
             .kitty_desktop_notification,
             .context_signal,
             .unknown,
+            .program_status,
             => {},
         }
 
@@ -974,7 +987,23 @@ pub const Parser = struct {
             .@"7" => switch (c) {
                 ';' => self.captureTrailing(.fixed),
                 '2' => self.state = .@"72",
+                '5' => self.state = .@"75",
                 '7' => self.state = .@"77",
+                else => self.unknownOrInvalid(c),
+            },
+
+            .@"75" => switch (c) {
+                '0' => self.state = .@"750",
+                else => self.unknownOrInvalid(c),
+            },
+
+            .@"750" => switch (c) {
+                '1' => self.state = .@"7501",
+                else => self.unknownOrInvalid(c),
+            },
+
+            .@"7501" => switch (c) {
+                ';' => self.captureTrailing(.allocating),
                 else => self.unknownOrInvalid(c),
             },
 
@@ -1083,6 +1112,8 @@ pub const Parser = struct {
             .@"55",
             .@"552",
             .@"6",
+            .@"75",
+            .@"750",
             .@"77",
             => bridge: {
                 self.unknownOrInvalid(null);
@@ -1141,6 +1172,8 @@ pub const Parser = struct {
             .@"72" => parsers.kitty_dnd_protocol.parse(self, terminator_ch),
 
             .@"99" => parsers.kitty_desktop_notification.parse(self, terminator_ch),
+
+            .@"7501" => parsers.program_status.parse(self, terminator_ch),
 
             .@"133" => parsers.semantic_prompt.parse(self, terminator_ch),
 
