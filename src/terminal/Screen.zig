@@ -3159,6 +3159,9 @@ pub fn selectLine(self: *const Screen, opts: SelectLine) ?Selection {
         const whitespace = opts.whitespace orelse break :start start_pin;
         var it = start_pin.cellIterator(.right_down, end_pin);
         while (it.next()) |p| {
+            // CellIterator only limits the row, so bound the column too.
+            if (end_pin.before(p)) return null;
+
             const cell = p.rowAndCell().cell;
             if (!cell.hasText()) continue;
 
@@ -9728,6 +9731,25 @@ test "Screen: selectLine semantic prompt boundary" {
             .x = 0,
             .y = 2,
         } }, s.pages.pointFromPin(.active, sel.end()).?);
+    }
+}
+
+test "Screen: selectLine semantic boundary around unwritten cells" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+    const io = testing.io;
+
+    var s = try init(io, alloc, .{ .cols = 5, .rows = 1, .max_scrollback_bytes = 0 });
+    defer s.deinit();
+
+    s.cursorSetSemanticContent(.{ .prompt = .initial });
+    try s.testWriteString("x");
+    s.cursorRight(2);
+    try s.testWriteString("m");
+
+    for (1..3) |x| {
+        const pin = s.pages.pin(.{ .active = .{ .x = @intCast(x) } }).?;
+        try testing.expect(s.selectLine(.{ .pin = pin }) == null);
     }
 }
 
