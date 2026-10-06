@@ -1662,9 +1662,10 @@ fn printCell(
             break :c unmapped_c;
         }
 
-        // If we're outside of ASCII range this is an invalid value in
-        // this table so we just return space.
-        if (unmapped_c > std.math.maxInt(u8)) break :c ' ';
+        // The tables only cover 0x00-0xFF. Like xterm, which never remaps a
+        // character above 255 in UTF-8 mode, we print anything above as is,
+        // which also keeps it at the width it was measured with.
+        if (unmapped_c > std.math.maxInt(u8)) break :c unmapped_c;
 
         // Get our lookup table and map it
         const table = charsets.table(set);
@@ -6976,10 +6977,31 @@ test "Terminal: print charset outside of ASCII" {
     {
         const str = try t.plainString(testing.allocator);
         defer testing.allocator.free(str);
-        try testing.expectEqualStrings("◆ ", str);
+        try testing.expectEqualStrings("◆😀", str);
     }
 
     try testing.expect(t.isDirty(.{ .screen = .{ .x = 0, .y = 0 } }));
+}
+
+test "Terminal: print wide codepoint in a charset prints it unmapped" {
+    var t = try init(testing.io, testing.allocator, .{ .cols = 10, .rows = 2 });
+    defer t.deinit(testing.allocator);
+
+    // The charset has no such codepoint, so it prints as it is, two
+    // columns wide, and the characters after it are mapped again.
+    t.configureCharset(.G0, .dec_special);
+    try t.print('`');
+    try t.print(0x1F600);
+    try t.print('a');
+    try testing.expectEqual(@as(usize, 4), t.screens.active.cursor.x);
+    const cell = t.screens.active.pages.getCell(.{ .screen = .{ .x = 1, .y = 0 } }).?.cell;
+    try testing.expectEqual(@as(u21, 0x1F600), cell.codepoint());
+    try testing.expectEqual(.wide, cell.wide);
+    {
+        const str = try t.plainString(testing.allocator);
+        defer testing.allocator.free(str);
+        try testing.expectEqualStrings("◆😀▒", str);
+    }
 }
 
 test "Terminal: print invoke charset" {
