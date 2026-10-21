@@ -1266,10 +1266,6 @@ const SplitTreeSplit = extern struct {
             break :max gobject.ext.Value.get(&val, c_int);
         };
 
-        // We don't use min. It's non-zero when the start child has a minimum
-        // size, but gtk.Paned keeps the position between min and max itself.
-        _ = min;
-
         // The size of the split as pixels, which ratios are relative to.
         // Since gtk.Paned doesn't shrink the end child below its minimum
         // size, max is reduced by that minimum size, so add it back.
@@ -1317,36 +1313,52 @@ const SplitTreeSplit = extern struct {
                 // Update position in gtk.Paned to match desired ratio. Note that if
                 // the size is small, it might not be possible to accurately set
                 // the desired ratio. E.g. with a size of 2 you can only have
-                // ratios 0, 0.5 and 1. gtk.Paned keeps the position between
-                // the minimum sizes of the children.
+                // ratios 0, 0.5 and 1.
                 const desired_pos: c_int = desired_pos: {
                     const size_f64: f64 = @floatFromInt(size);
                     break :desired_pos @intFromFloat(@round(size_f64 * desired_ratio));
                 };
-                paned.setPosition(desired_pos);
+
+                // gtk.Paned would clamp this too, but a frame later.
+                const pos_clamped = std.math.clamp(desired_pos, min, @max(min, max));
+                paned.setPosition(pos_clamped);
+
+                // If clamped, store the ratio we show so it can't drift.
+                if (pos_clamped != desired_pos) {
+                    const pos_f64: f64 = @floatFromInt(pos_clamped);
+                    const size_f64: f64 = @floatFromInt(size);
+                    self.setTreeRatio(pos_f64 / size_f64);
+                }
             },
-            .widget_to_tree => {
-                // Update ratio of the split tree node. This is the most dangerous
-                // part of this widget. We assume that this widget is always a child
-                // of a SplitTree, we assume that our handle is valid, and we assume
-                // the handle is always a split node.
-                const split_tree = ext.getAncestor(
-                    SplitTree,
-                    self.as(gtk.Widget),
-                ) orelse {
-                    log.warn("SplitTree ancestor not found", .{});
-                    return;
-                };
-                const tree = split_tree.getTree() orelse {
-                    log.warn("no tree data model set", .{});
-                    return;
-                };
-                assert(priv.handle.idx() < tree.nodes.len);
-                assert(tree.nodes[priv.handle.idx()] == .split);
-                tree.resizeInPlace(priv.handle, @floatCast(current_ratio));
-                priv.ratio = current_ratio;
-            },
+            .widget_to_tree => self.setTreeRatio(current_ratio),
         }
+    }
+
+    /// Update ratio of the split tree node. This is the most dangerous
+    /// part of this widget. We assume that this widget is always a child
+    /// of a SplitTree, we assume that our handle is valid, and we assume
+    /// the handle is always a split node.
+    fn setTreeRatio(self: *Self, ratio: f64) void {
+        const priv = self.private();
+        const split_tree = ext.getAncestor(
+            SplitTree,
+            self.as(gtk.Widget),
+        ) orelse {
+            log.warn("SplitTree ancestor not found", .{});
+            return;
+        };
+
+        // A pending rebuild means our handle is for the old tree.
+        if (split_tree.private().rebuild_source != null) return;
+
+        const tree = split_tree.getTree() orelse {
+            log.warn("no tree data model set", .{});
+            return;
+        };
+        assert(priv.handle.idx() < tree.nodes.len);
+        assert(tree.nodes[priv.handle.idx()] == .split);
+        tree.resizeInPlace(priv.handle, @floatCast(ratio));
+        priv.ratio = ratio;
     }
 
     // We need to keep the split ratios from the tree datastructure and
