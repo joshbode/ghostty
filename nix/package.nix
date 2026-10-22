@@ -92,6 +92,7 @@ in
       "-Dcpu=baseline"
       "-Doptimize=${optimize}"
       "-Dstrip=${lib.boolToString strip}"
+      "-Dinstalled-exe-path=${placeholder "out"}/bin/ghostty"
     ];
 
     outputs = [
