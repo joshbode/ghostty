@@ -6911,8 +6911,9 @@ test "stream: continuation suffixes are replay safe" {
         .{ .input = "text\x1b[12\x1b", .expected = "\x1b" },
         .{
             .input = "text\x1b[12\x9D2;title",
-            .expected = "\x1b[12\x9D2;title",
+            .expected = "\x1b]2;title",
         },
+        .{ .input = "text\x1b_Gabc\x9B1", .expected = "\x1b[1" },
     };
 
     const S = Stream(ContinuationTestHandler);
