@@ -590,6 +590,9 @@ pub const Surface = extern struct {
         /// resized to within a split: one cell plus the window padding.
         split_min_size: Size = .{ .width = 1, .height = 1 },
 
+        /// The size of a cell, in pixels, from the last cell_size action.
+        cell_size: ?Size = null,
+
         /// The requested font size. This only applies to initialization
         /// and has no effect later.
         font_size_request: ?*font.face.DesiredSize = null,
@@ -2248,14 +2251,22 @@ pub const Surface = extern struct {
     /// that this surface can be resized to within a split, so that a split
     /// is never so small that none of its terminal is visible.
     pub fn setCellSize(self: *Self, width: u32, height: u32) void {
+        self.private().cell_size = .{ .width = width, .height = height };
+        self.syncSplitMinSize();
+    }
+
+    /// Update the smallest size that this surface can be resized to within
+    /// a split, from the cell size and the window padding.
+    fn syncSplitMinSize(self: *Self) void {
         const priv = self.private();
+        const cell_size = priv.cell_size orelse return;
         const config_obj = priv.config orelse return;
         const config = config_obj.get();
 
         // The cell size is in pixels but widget sizes are in logical pixels.
         const content_scale = self.getContentScale();
-        const width_f32: f32 = @floatFromInt(width);
-        const height_f32: f32 = @floatFromInt(height);
+        const width_f32: f32 = @floatFromInt(cell_size.width);
+        const height_f32: f32 = @floatFromInt(cell_size.height);
         const cell_width: u32 = @intFromFloat(@ceil(width_f32 / content_scale.x));
         const cell_height: u32 = @intFromFloat(@ceil(height_f32 / content_scale.y));
 
@@ -2401,6 +2412,9 @@ pub const Surface = extern struct {
     ) callconv(.c) void {
         const priv = self.private();
         const config = if (priv.config) |c| c.get() else return;
+
+        // window-padding-x, window-padding-y
+        self.syncSplitMinSize();
 
         // resize-overlay-duration
         {
