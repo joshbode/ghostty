@@ -24,8 +24,8 @@
         },
         .z2d = .{
             // vancluever/z2d
-            .url = "https://deps.files.ghostty.org/z2d-f3cf28188dae39946964c81475ff234c008125a6.tar.gz",
-            .hash = "z2d-0.12.2-pre-j5P_HilCEQDH_2RC0PZqYQd4rHTl13b-VXpaDQ1sE4kZ",
+            .url = "https://github.com/vancluever/z2d/archive/40af3e84a4e15a9f31d126b3f281f23ce6a3dae5.tar.gz",
+            .hash = "z2d-0.13.0-j5P_HgsRFABzZDH54gI35P0OSrg7HFyJwS2bXX5uBdU4",
             .lazy = true,
         },
         .zig_objc = .{
