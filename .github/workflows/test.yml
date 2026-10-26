@@ -614,6 +614,8 @@ jobs:
             aarch64-linux,
             x86_64-linux,
             x86_64-linux-musl,
+            aarch64-freebsd,
+            x86_64-freebsd,
             x86_64-windows-gnu,
             # doesn't work yet, we need a way to find msvc libc/c++ headers
             # x86_64-windows-msvc
