@@ -188,7 +188,7 @@
     };
     "z2d-0.13.0-j5P_HgsRFABzZDH54gI35P0OSrg7HFyJwS2bXX5uBdU4" = fetchzip {
       name = "z2d";
-      url = "https://github.com/vancluever/z2d/archive/40af3e84a4e15a9f31d126b3f281f23ce6a3dae5.tar.gz";
+      url = "https://deps.files.ghostty.org/z2d-40af3e84a4e15a9f31d126b3f281f23ce6a3dae5.tar.gz";
       hash = "sha256-3fpPl8dvDhqJMa4xreFSKHSqaXSNdP+22kQUQobTOEY=";
     };
     "zf-0.11.0-OIRy8XCRAAB6FiMwIrtD6FqlagnFwpI6YyOu7bXeYH5J" = fetchzip {
