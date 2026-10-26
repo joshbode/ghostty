@@ -243,7 +243,7 @@ jobs:
 
   build-example-zig-vt-macos-no-sdk:
     name: Example zig-vt (macOS, no SDK)
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     needs: test
     env:
       ZIG_LOCAL_CACHE_DIR: /Users/runner/zig/local-cache
@@ -344,7 +344,7 @@ jobs:
       matrix:
         dir: ${{ fromJSON(needs.list-examples.outputs.swift) }}
     name: Example ${{ matrix.dir }}
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     needs: [test, list-examples]
     env:
       ZIG_LOCAL_CACHE_DIR: /Users/runner/zig/local-cache
@@ -371,7 +371,7 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Xcode Select
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
 
       - name: Build XCFramework
         run: nix develop -c zig build -Demit-lib-vt
@@ -843,7 +843,7 @@ jobs:
             platform: 7
             arch: arm64
             expect_encryption: false
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     needs: test
     env:
       ZIG_LOCAL_CACHE_DIR: /Users/runner/zig/local-cache
@@ -870,7 +870,7 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Xcode Select
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
 
       - name: Build
         run: |
@@ -1246,7 +1246,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # build-nix-macos:
-  #   runs-on: namespace-profile-ghostty-macos-tahoe
+  #   runs-on: namespace-profile-ghostty-macos-golden
   #   needs: test
   #   steps:
   #     - name: Checkout code
@@ -1298,7 +1298,7 @@ jobs:
   #         nix build .#libghostty-vt-debug-no-simd.tests.build-example-c-vt-build-info
 
   build-macos:
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     needs: test
     env:
       ZIG_LOCAL_CACHE_DIR: /Users/runner/zig/local-cache
@@ -1325,7 +1325,7 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Xcode Select
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
 
       - name: Xcode Version
         run: xcodebuild -version
@@ -1350,7 +1350,7 @@ jobs:
             COMPILATION_CACHE_KEEP_CAS_DIRECTORY=YES
 
   build-macos-xcode-27:
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     needs: test
     env:
       ZIG_LOCAL_CACHE_DIR: /Users/runner/zig/local-cache
@@ -1377,7 +1377,7 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Xcode Select
-        run: sudo xcode-select -s /Applications/Xcode_27.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
 
       - name: Xcode Version
         run: xcodebuild -version
@@ -1390,7 +1390,7 @@ jobs:
         run: nix develop -c zig build --system ${{ steps.deps.outputs.deps }} -Demit-macos-app=false
 
   build-macos-freetype:
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     needs: test
     env:
       ZIG_LOCAL_CACHE_DIR: /Users/runner/zig/local-cache
@@ -1417,7 +1417,7 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Xcode Select
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
 
       - name: Xcode Version
         run: xcodebuild -version
@@ -1739,7 +1739,7 @@ jobs:
           nix develop -c zig build -Dsentry=${{ matrix.sentry }}
 
   test-macos:
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     needs: test
     env:
       ZIG_LOCAL_CACHE_DIR: /Users/runner/zig/local-cache
@@ -1766,7 +1766,7 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Xcode Select
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
 
       - name: Xcode Version
         run: xcodebuild -version
@@ -1938,7 +1938,7 @@ jobs:
 
   swiftlint:
     if: github.repository == 'ghostty-org/ghostty' && needs.skip.outputs.skip != 'true' && needs.skip.outputs.macos == 'true'
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     needs: skip
     timeout-minutes: 60
     steps:

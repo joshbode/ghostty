@@ -335,7 +335,7 @@ jobs:
           github.ref_name == 'main'
         )
       )
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     env:
       GHOSTTY_COMMIT_LONG: ${{ needs.setup.outputs.commit_long }}
       ZIG_LOCAL_CACHE_DIR: /Users/runner/zig/local-cache
@@ -362,7 +362,7 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: Xcode Select
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
 
       - name: Build XCFramework
         run: nix develop -c zig build -Demit-lib-vt -Doptimize=ReleaseFast
@@ -550,7 +550,7 @@ jobs:
         )
       )
 
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     timeout-minutes: 90
     env:
       GHOSTTY_BUILD: ${{ needs.setup.outputs.build }}
@@ -583,7 +583,7 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: XCode Select
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
 
       - name: Xcode Version
         run: xcodebuild -version
@@ -806,7 +806,7 @@ jobs:
         )
       )
 
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     timeout-minutes: 90
     env:
       GHOSTTY_BUILD: ${{ needs.setup.outputs.build }}
@@ -839,7 +839,7 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: XCode Select
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
 
       - name: Xcode Version
         run: xcodebuild -version
@@ -1003,7 +1003,7 @@ jobs:
         )
       )
 
-    runs-on: namespace-profile-ghostty-macos-tahoe
+    runs-on: namespace-profile-ghostty-macos-golden
     timeout-minutes: 90
     env:
       GHOSTTY_BUILD: ${{ needs.setup.outputs.build }}
@@ -1036,7 +1036,7 @@ jobs:
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
 
       - name: XCode Select
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+        run: sudo xcode-select -s /Applications/Xcode_27.1.app
 
       - name: Xcode Version
         run: xcodebuild -version
