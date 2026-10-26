@@ -16163,6 +16163,25 @@ test "PageList resize (no reflow) more rows adds blank rows if cursor at bottom"
     }
 }
 
+test "PageList resize reflow from max cols to narrow" {
+    const testing = std.testing;
+    const alloc = testing.allocator;
+
+    // A max-width page is large enough that narrowing it to 2 columns
+    // frees memory for more rows than a page can hold. The resize must
+    // cap the row count instead of overflowing it.
+    var s = try init(alloc, .{
+        .cols = std.math.maxInt(size.CellCountInt),
+        .rows = 1,
+        .max_size = 0,
+    });
+    defer s.deinit();
+
+    try s.resize(.{ .cols = 2, .reflow = true });
+    try testing.expectEqual(@as(usize, 2), s.cols);
+    s.assertIntegrity();
+}
+
 test "PageList resize reflow more cols no wrapped rows" {
     const testing = std.testing;
     const alloc = testing.allocator;
