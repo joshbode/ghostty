@@ -1734,8 +1734,8 @@ pub inline fn eraseHistory(
     defer self.assertIntegrity();
 
     // Placements anchored in the erased rows are removed first, while
-    // their pins still identify those rows. Erasing moves those pins to
-    // the top-left of the retained rows rather than marking them garbage.
+    // their pins still identify those rows. Erasing marks those pins as
+    // garbage and moves them to the top-left of the retained rows.
     if (comptime build_options.kitty_graphics) {
         self.kitty_images.eraseHistory(self.io, self, bl);
     }
