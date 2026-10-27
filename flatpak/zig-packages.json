@@ -210,10 +210,10 @@
     "sha256": "c7d268d7c0dcecfeb209d0ccf2b04364d1541722c5e53e4c5bbd3eaa481847a4"
   },
   {
-    "type": "git",
-    "url": "https://github.com/sergot/zigimg",
-    "commit": "c701c9f99779d7ddf594dcc6da8f858fd277d61f",
-    "dest": "vendor/p/zigimg-0.1.0-8_eo2ri_FwBqF5UYiggLz4IGjHJO_n9-B6gT9Ayqg8G4"
+    "type": "archive",
+    "url": "https://deps.files.ghostty.org/zigimg-c701c9f99779d7ddf594dcc6da8f858fd277d61f.tar.gz",
+    "dest": "vendor/p/zigimg-0.1.0-8_eo2ri_FwBqF5UYiggLz4IGjHJO_n9-B6gT9Ayqg8G4",
+    "sha256": "5e427099ae2f1a52592c947117b1abe25a6e17a26d78c260e21b86fdf46b418f"
   },
   {
     "type": "archive",

@@ -211,11 +211,10 @@
       url = "https://deps.files.ghostty.org/zig_wayland-27dda01712ddf3cb46ebd93380d88b01a7c828f8.tar.gz";
       hash = "sha256-rtPmYAd+suOBW9bPmP42Tv1NGK+U5W0EDqpkakD8gtY=";
     };
-    "zigimg-0.1.0-8_eo2ri_FwBqF5UYiggLz4IGjHJO_n9-B6gT9Ayqg8G4" = fetchZigGit {
+    "zigimg-0.1.0-8_eo2ri_FwBqF5UYiggLz4IGjHJO_n9-B6gT9Ayqg8G4" = fetchzip {
       name = "zigimg";
-      url = "https://github.com/sergot/zigimg";
-      rev = "c701c9f99779d7ddf594dcc6da8f858fd277d61f";
-      hash = "sha256-E98GBI7t+CtgEyJjdIVEomXN+3Kn7to2XtZKixsPILk=";
+      url = "https://deps.files.ghostty.org/zigimg-c701c9f99779d7ddf594dcc6da8f858fd277d61f.tar.gz";
+      hash = "sha256-1Qye38dmT8tgqOmc36pVKY8idDEOVlCeFCT6QDTYlbw=";
     };
     "N-V-__8AAB0eQwD-0MdOEBmz7intriBReIsIDNlukNVoNu6o" = fetchzip {
       name = "zlib";

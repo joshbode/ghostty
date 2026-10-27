@@ -3,6 +3,7 @@
     .version = "1.4.1-dev",
     .paths = .{""},
     .fingerprint = 0x64407a2a0b4147e5,
+    // Keep in sync with snap/snapcraft.yaml and flatpak/dependencies.yml
     .minimum_zig_version = "0.17.0",
     .dependencies = .{
         // Our higher-level C translation helper (this also helps ensure we
@@ -21,6 +22,14 @@
             .url = "https://deps.files.ghostty.org/vaxis-6fd944a27fb3d6f596e981076381a3131f2448b4.tar.gz",
             .hash = "vaxis-0.6.0-BWNV_MafDAAEzkVUvrW9NFUqnnMUoeHqrs2mecnD6D7w",
             .lazy = true,
+        },
+        .zigimg = .{
+            // sergot/zigimg (via vaxis)
+            // The commit vaxis pins is no longer on any upstream branch, so
+            // we pin the same hash to our mirror. Must not be lazy, or Zig
+            // falls back to the git URL in vaxis's build.zig.zon.
+            .url = "https://deps.files.ghostty.org/zigimg-c701c9f99779d7ddf594dcc6da8f858fd277d61f.tar.gz",
+            .hash = "zigimg-0.1.0-8_eo2ri_FwBqF5UYiggLz4IGjHJO_n9-B6gT9Ayqg8G4",
         },
         .z2d = .{
             // vancluever/z2d
