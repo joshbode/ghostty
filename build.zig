@@ -363,7 +363,6 @@ pub fn build(b: *std.Build) !void {
         });
         const mod_vt_test_run = b.addRunArtifact(mod_vt_test);
         test_lib_vt_step.dependOn(&mod_vt_test_run.step);
-        test_lib_vt_build_step.dependOn(&mod_vt_test.step);
 
         const mod_vt_c_test = b.addTest(.{
             .name = "ghostty-vt-c-test",
@@ -372,15 +371,18 @@ pub fn build(b: *std.Build) !void {
         });
         const mod_vt_c_test_run = b.addRunArtifact(mod_vt_c_test);
         test_lib_vt_step.dependOn(&mod_vt_c_test_run.step);
-        test_lib_vt_build_step.dependOn(&mod_vt_c_test.step);
 
-        // With -Demit-test-exe, test-lib-vt-build also installs the C API
-        // test binary to zig-out/bin, so it can run on another machine. CI
-        // uses this to run it in a FreeBSD VM. Only the C API binary is
-        // installed because it already runs every test in the Zig one.
         if (config.emit_test_exe) {
+            // With -Demit-test-exe, test-lib-vt-build builds only the C API
+            // test binary and installs it to zig-out/bin, so it can run on
+            // another machine. CI uses this to run it in a FreeBSD VM. The
+            // C API binary already runs every test in the Zig one, and
+            // compiling both at once can run a CI runner out of memory.
             const install = b.addInstallArtifact(mod_vt_c_test, .{});
             test_lib_vt_build_step.dependOn(&install.step);
+        } else {
+            test_lib_vt_build_step.dependOn(&mod_vt_test.step);
+            test_lib_vt_build_step.dependOn(&mod_vt_c_test.step);
         }
     }
 
