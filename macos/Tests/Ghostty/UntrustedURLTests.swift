@@ -52,6 +52,53 @@ struct UntrustedURLTests {
         #expect(result == file.standardizedFileURL.resolvingSymlinksInPath())
     }
 
+    @Test
+    func allowsLocalFilesWithLocalHostnames() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appending(path: "document.txt")
+        try "safe".write(to: file, atomically: true, encoding: .utf8)
+
+        // e.g. GNU ls --hyperlink emits file://<hostname>/path
+        let hostName = try #require(UntrustedURL.localHostName)
+        for host in ["localhost", "LOCALHOST", hostName, hostName.uppercased()] {
+            let value = "file://\(host)\(file.path(percentEncoded: true))"
+            guard case .allow(let result) = UntrustedURL(value).decision else {
+                Issue.record("expected a safe local file for host \(host)")
+                continue
+            }
+            #expect(result == file.standardizedFileURL.resolvingSymlinksInPath())
+            #expect(result.host?.isEmpty ?? true)
+        }
+    }
+
+    @Test
+    func rejectsFilesOnRemoteHosts() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appending(path: "document.txt")
+        try "safe".write(to: file, atomically: true, encoding: .utf8)
+
+        let value = "file://not-this-host.example.com\(file.path(percentEncoded: true))"
+        #expect(UntrustedURL(value).decision == .deny(.remoteFile))
+    }
+
+    @Test
+    func localHostnamesStillRejectExecutableFiles() throws {
+        let directory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appending(path: "payload.txt")
+        try "#!/bin/sh\n".write(to: file, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: file.path
+        )
+
+        let hostName = try #require(UntrustedURL.localHostName)
+        let value = "file://\(hostName)\(file.path(percentEncoded: true))"
+        #expect(UntrustedURL(value).decision == .deny(.unsafeFile))
+    }
+
     @Test(arguments: ["payload.command", "payload.tool", "payload.app", "payload.workflow"])
     func rejectsDangerousLocalFileExtensions(_ filename: String) throws {
         let directory = try makeTemporaryDirectory()

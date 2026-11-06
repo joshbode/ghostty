@@ -8,6 +8,7 @@ struct UntrustedURL: Equatable {
         case malformedURL
         case unsafeCharacters
         case invalidWebURL
+        case remoteFile
         case inaccessibleFile
         case unsafeFile
 
@@ -19,6 +20,8 @@ struct UntrustedURL: Equatable {
                 "The target contains invisible or line-breaking characters."
             case .invalidWebURL:
                 "The web target does not contain a valid host."
+            case .remoteFile:
+                "The file target is on another host."
             case .inaccessibleFile:
                 "The local target does not exist or is not a regular file or directory."
             case .unsafeFile:
@@ -106,6 +109,26 @@ struct UntrustedURL: Equatable {
         value.unicodeScalars.contains(where: isUnsafeCharacter)
     }
 
+    /// Whether `host` names this machine: empty, `localhost`, or the hostname
+    /// reported by `gethostname`. This matches the core's validation of OSC 7
+    /// file URLs (`src/os/hostname.zig`).
+    static func isLocalHost(_ host: String) -> Bool {
+        if host.isEmpty || host.caseInsensitiveCompare("localhost") == .orderedSame {
+            return true
+        }
+        guard let localHostName else { return false }
+        return host.caseInsensitiveCompare(localHostName) == .orderedSame
+    }
+
+    /// This machine's hostname as reported by `gethostname`, which is what
+    /// command-line tools embed in the file URLs they emit.
+    static var localHostName: String? {
+        var buffer = [CChar](repeating: 0, count: Int(MAXHOSTNAMELEN) + 1)
+        guard gethostname(&buffer, buffer.count - 1) == 0 else { return nil }
+        let name = buffer.withUnsafeBufferPointer { String(cString: $0.baseAddress!) }
+        return name.isEmpty ? nil : name
+    }
+
     /// A single-line representation of the effective target. Paths are
     /// standardized before display so traversal and repeated separators cannot
     /// cause the visible and opened targets to differ.
@@ -151,18 +174,24 @@ private extension UntrustedURL {
             return .deny(.malformedURL)
         }
 
-        // An empty host and localhost both refer to this machine. Do not allow
-        // file URLs that name a remote host and could trigger network access.
-        if let host = url.host,
-           !host.isEmpty,
-           host.caseInsensitiveCompare("localhost") != .orderedSame {
-            return .deny(.malformedURL)
+        // An empty host, localhost, and this machine's hostname all refer to
+        // this machine. Tools such as GNU ls, fd, and delta include the
+        // hostname in OSC 8 file URLs. Do not allow file URLs that name a
+        // remote host and could trigger network access.
+        var localURL = url
+        if let host = url.host, !host.isEmpty {
+            guard Self.isLocalHost(host) else {
+                return .deny(.remoteFile)
+            }
+
+            // Drop the host so handlers receive a plain local file URL.
+            localURL = URL(filePath: url.path(percentEncoded: false))
         }
 
         // Classify the effective object, not the spelling supplied by terminal
         // output. This collapses dot traversal and prevents a harmless-looking
         // symlink name from hiding an executable target.
-        let canonicalURL = url.standardizedFileURL.resolvingSymlinksInPath()
+        let canonicalURL = localURL.standardizedFileURL.resolvingSymlinksInPath()
         let resourceValues: URLResourceValues
         do {
             // Reading all relevant resource keys together also proves that the
